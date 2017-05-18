@@ -53,14 +53,14 @@
 #include "nrf_drv_clock.h"
 #include "nrf_drv_rtc.h"
 
-#define UART_PRINTING_ENABLED                     //Enable to see SAADC output on UART. Comment out for low power operation.
+// #define UART_PRINTING_ENABLED                     //Enable to see SAADC output on UART. Comment out for low power operation.
 #define UART_TX_BUF_SIZE 256                      //UART TX buffer size. 
 #define UART_RX_BUF_SIZE 1                        //UART RX buffer size. 
-#define RTC_CC_VALUE 8                            //Determines the RTC interrupt frequency and thereby the SAADC sampling frequency
+#define RTC_CC_VALUE 4                            //Determines the RTC interrupt frequency and thereby the SAADC sampling frequency
 #define SAADC_CALIBRATION_INTERVAL 5              //Determines how often the SAADC should be calibrated relative to NRF_DRV_SAADC_EVT_DONE event. E.g. value 5 will make the SAADC calibrate every fifth time the NRF_DRV_SAADC_EVT_DONE is received.
-#define SAADC_SAMPLES_IN_BUFFER 4                 //Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
-#define SAADC_OVERSAMPLE NRF_SAADC_OVERSAMPLE_4X  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
-#define SAADC_BURST_MODE 1                        //Set to 1 to enable BURST mode, otherwise set to 0.
+#define SAADC_SAMPLES_IN_BUFFER 1                 //Number of SAADC samples in RAM before returning a SAADC event. For low power SAADC set this constant to 1. Otherwise the EasyDMA will be enabled for an extended time which consumes high current.
+#define SAADC_OVERSAMPLE 0//NRF_SAADC_OVERSAMPLE_4X  //Oversampling setting for the SAADC. Setting oversample to 4x This will make the SAADC output a single averaged value when the SAMPLE task is triggered 4 times. Enable BURST mode to make the SAADC sample 4 times when triggering SAMPLE task once.
+#define SAADC_BURST_MODE 0//1                        //Set to 1 to enable BURST mode, otherwise set to 0.
 
 void saadc_init(void);
 
@@ -115,7 +115,7 @@ static void rtc_handler(nrf_drv_rtc_int_type_t int_type)
         m_saadc_initialized = true;                                    //Set SAADC as initialized
         nrf_drv_saadc_sample();                                        //Trigger the SAADC SAMPLE task
 			
-        LEDS_INVERT(BSP_LED_0_MASK);                                   //Toggle LED1 to indicate SAADC sampling start
+        // LEDS_INVERT(BSP_LED_0_MASK);                                   //Toggle LED1 to indicate SAADC sampling start
 			
         err_code = nrf_drv_rtc_cc_set(&rtc,0,RTC_CC_VALUE,true);       //Set RTC compare value. This needs to be done every time as the nrf_drv_rtc clears the compare register on every compare match
         APP_ERROR_CHECK(err_code);
@@ -153,9 +153,10 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
     {
         ret_code_t err_code;
 			
-        LEDS_INVERT(BSP_LED_1_MASK);                                                                    //Toggle LED2 to indicate SAADC buffer full		
+        // LEDS_INVERT(BSP_LED_1_MASK);                                                                  //Toggle LED2 to indicate SAADC buffer full		
+        UNUSED_PARAMETER(m_adc_evt_counter);
 
-        if((m_adc_evt_counter % SAADC_CALIBRATION_INTERVAL) == 0)                                       //Evaluate if offset calibration should be performed. Configure the SAADC_CALIBRATION_INTERVAL constant to change the calibration frequency
+        if (0)        // if((m_adc_evt_counter % SAADC_CALIBRATION_INTERVAL) == 0)                                       //Evaluate if offset calibration should be performed. Configure the SAADC_CALIBRATION_INTERVAL constant to change the calibration frequency
         {
 #ifdef UART_PRINTING_ENABLED
             printf("SAADC calibration starting...  \r\n");                                              //Print on UART
@@ -164,7 +165,7 @@ void saadc_callback(nrf_drv_saadc_evt_t const * p_event)
             nrf_saadc_task_trigger(NRF_SAADC_TASK_CALIBRATEOFFSET);                                     //Trigger calibration task
             while(!NRF_SAADC->EVENTS_CALIBRATEDONE);                                                    //Wait until calibration task is completed. The calibration tasks takes about 1000us with 10us acquisition time. Configuring shorter or longer acquisition time will make the calibration take shorter or longer respectively.
             while(NRF_SAADC->STATUS == (SAADC_STATUS_STATUS_Busy << SAADC_STATUS_STATUS_Pos));          //Additional wait for busy flag to clear. Without this wait, calibration is actually not completed. This may take additional 100us - 300us
-            LEDS_INVERT(BSP_LED_2_MASK);                                                                //Toggle LED3 to indicate SAADC calibration complete
+            // LEDS_INVERT(BSP_LED_2_MASK);                                                                //Toggle LED3 to indicate SAADC calibration complete
 #ifdef UART_PRINTING_ENABLED
             printf("SAADC calibration complete ! \r\n");                                                //Print on UART
 #endif //UART_PRINTING_ENABLED	
@@ -239,6 +240,7 @@ int main(void)
     LEDS_OFF(LEDS_MASK);                             //Turn off all leds
 	
     NRF_POWER->DCDCEN = 1;                           //Enabling the DCDC converter for lower current consumption
+    NRF_POWER->TASKS_LOWPWR = 1;
 	
 #ifdef UART_PRINTING_ENABLED
     uart_config();                                   //Configure UART. UART is used to show the SAADC sampled result.
